@@ -23,7 +23,7 @@ CHROME_USER_DATA_DIR = os.getenv("CHROME_USER_DATA_DIR", DEFAULT_CHROME_USER_DAT
 CHROME_PROFILE_NAME = os.getenv("CHROME_PROFILE_NAME", "Default").strip() or "Default"
 REMOTE_DEBUGGING_PORT = int(os.getenv("CHROME_DEBUG_PORT", "9222"))
 
-GEMINI_API_KEY = os.getenv("", "").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     GEMINI_MODEL = genai.GenerativeModel("gemini-2.5-flash")
@@ -560,9 +560,136 @@ class ResultPanel(ctk.CTkScrollableFrame):
 
 
 # ─────────────────────────────────────────────
-# T3 — APP & WINDOW CONTROLLER
+# T3 — EMAIL · SPAM · SYSTEM CONTROLS
 # ─────────────────────────────────────────────
 
+# ── contacts shortbook (name → email) ─────────
+# NOTE: Add your contacts here in the format:
+# CONTACTS = {
+#     "contact_name": "email@example.com",
+#     "boss": "boss@example.com",
+# }
+CONTACTS = {}
+
+# ── spam signals used for Gmail search ────────
+SPAM_GMAIL_QUERY = (
+    "is:unread ("
+    "subject:winner OR subject:congratulations OR subject:urgent OR "
+    "subject:verify OR subject:suspended OR subject:act now OR "
+    "subject:click here OR subject:free OR subject:prize OR "
+    "from:noreply OR from:no-reply OR from:donotreply"
+    ")"
+)
+
+
+# ── email parsing ──────────────────────────────
+def _parse_email_command(text: str) -> dict:
+    """
+    Parses natural language like:
+      'email rahul subject meeting body see you at 10'
+      'send mail to priya subject hello body how are you'
+      'mail boss subject urgent'
+    Returns dict with keys: to_raw, to_email, subject, body
+    """
+    lowered = text.lower().strip()
+
+    # strip leading trigger words
+    for trigger in ["send email to ", "send mail to ", "send email ", "send mail ",
+                    "email to ", "mail to ", "email ", "mail "]:
+        if lowered.startswith(trigger):
+            lowered = lowered[len(trigger):]
+            break
+
+    # extract subject
+    subject = ""
+    body    = ""
+    to_raw  = lowered
+
+    if " subject " in lowered:
+        parts  = lowered.split(" subject ", 1)
+        to_raw = parts[0].strip()
+        rest   = parts[1]
+        if " body " in rest:
+            sub_parts = rest.split(" body ", 1)
+            subject   = sub_parts[0].strip()
+            body      = sub_parts[1].strip()
+        else:
+            subject = rest.strip()
+    elif " body " in lowered:
+        parts  = lowered.split(" body ", 1)
+        to_raw = parts[0].strip()
+        body   = parts[1].strip()
+
+    # resolve contact name → email
+    to_email = CONTACTS.get(to_raw.lower(), "")
+    if not to_email and ("@" in to_raw or "." in to_raw):
+        to_email = to_raw  # looks like a real address already
+
+    return {
+        "to_raw":   to_raw,
+        "to_email": to_email,
+        "subject":  subject,
+        "body":     body,
+    }
+
+
+def t3_send_email(parsed: dict, log_callback):
+    """Opens Gmail compose window in Chrome with fields pre-filled."""
+    to      = parsed.get("to_email", "")
+    subject = parsed.get("subject", "")
+    body    = parsed.get("body", "")
+    to_raw  = parsed.get("to_raw", "")
+
+    if not to:
+        log_callback(f"⚠  Don't know email for '{to_raw}'.")
+        log_callback("Add them to CONTACTS dict at the top of the script,")
+        log_callback("or type their full email address directly.")
+        # still open compose so user can fill manually
+        url = "https://mail.google.com/mail/?view=cm&fs=1"
+    else:
+        params = f"to={quote(to)}"
+        if subject:
+            params += f"&su={quote(subject)}"
+        if body:
+            params += f"&body={quote(body)}"
+        url = f"https://mail.google.com/mail/?view=cm&fs=1&{params}"
+        log_callback(f"📧 Composing email to {to}")
+        if subject:
+            log_callback(f"   Subject: {subject}")
+        if body:
+            log_callback(f"   Body: {body[:60]}{'…' if len(body)>60 else ''}")
+
+    open_in_chrome(url, log_callback, title_fragment="Gmail")
+    log_callback("✅ Gmail compose window opened — just hit Send!")
+
+
+def t3_scan_spam(log_callback):
+    """Opens Gmail filtered to likely spam/suspicious emails."""
+    url = f"https://mail.google.com/mail/u/0/#search/{quote(SPAM_GMAIL_QUERY)}"
+    log_callback("🔍 Scanning Gmail for suspicious emails…")
+    log_callback("   Flagging: prize/winner/urgent/verify/noreply senders")
+    open_in_chrome(url, log_callback, title_fragment="Gmail")
+    log_callback("✅ Gmail opened — suspicious emails highlighted.")
+    log_callback("   Select all → Delete to clean up in one shot.")
+
+
+def t3_open_inbox(log_callback):
+    open_in_chrome("https://mail.google.com/mail/u/0/#inbox", log_callback, title_fragment="Gmail")
+    log_callback("📬 Gmail inbox opened.")
+
+
+def t3_open_sent(log_callback):
+    open_in_chrome("https://mail.google.com/mail/u/0/#sent", log_callback, title_fragment="Gmail")
+    log_callback("📤 Gmail sent folder opened.")
+
+
+def t3_search_email(query: str, log_callback):
+    url = f"https://mail.google.com/mail/u/0/#search/{quote(query)}"
+    open_in_chrome(url, log_callback, title_fragment="Gmail")
+    log_callback(f"🔎 Searching Gmail for: {query}")
+
+
+# ── system controls (kept from original) ──────
 def _press_keys(*keys):
     VK = {
         "vol_mute": 0xAD, "vol_up": 0xAF, "vol_down": 0xAE,
@@ -585,7 +712,7 @@ def t3_screenshot(log_callback):
     except ImportError:
         log_callback("⚠  Pillow not installed. Run: pip install Pillow")
         return
-    desktop  = Path.home() / "Desktop"
+    desktop = Path.home() / "Desktop"
     desktop.mkdir(exist_ok=True)
     filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
     ImageGrab.grab().save(str(desktop / filename))
@@ -621,20 +748,6 @@ def t3_volume_down(log_callback):
     log_callback("🔉 Volume down.")
 
 
-def t3_open_task_manager(log_callback):
-    subprocess.Popen(["taskmgr.exe"])
-    log_callback("📊 Task Manager opened.")
-
-
-def t3_restart_explorer(log_callback):
-    log_callback("🔄 Restarting Windows Explorer…")
-    subprocess.call(["taskkill", "/f", "/im", "explorer.exe"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(1)
-    subprocess.Popen(["explorer.exe"])
-    log_callback("✅ Explorer restarted.")
-
-
 def t3_close_app(app_name: str, log_callback):
     if not app_name.strip():
         log_callback("No app name provided.")
@@ -655,8 +768,31 @@ def t3_close_app(app_name: str, log_callback):
         log_callback(f"⚠  Could not find '{app_name}' running.")
 
 
+# ── T3 parser ─────────────────────────────────
 def parse_t3_subcommand(text: str) -> dict:
     lowered = text.lower().strip()
+
+    # ── email commands ─────────────────────────
+    if any(w in lowered for w in ["scan spam", "check spam", "spam emails",
+                                   "suspicious emails", "spam mail", "flag spam"]):
+        return {"sub": "scan_spam"}
+
+    if any(w in lowered for w in ["open inbox", "check inbox", "my inbox",
+                                   "open gmail", "check email", "check mail"]):
+        return {"sub": "open_inbox"}
+
+    if any(w in lowered for w in ["sent emails", "sent mail", "open sent"]):
+        return {"sub": "open_sent"}
+
+    if lowered.startswith("search email ") or lowered.startswith("search mail ") \
+            or lowered.startswith("find email "):
+        keyword = re.split(r"search (?:email|mail)|find email", lowered)[-1].strip()
+        return {"sub": "search_email", "query": keyword}
+
+    if any(lowered.startswith(t) for t in ["email ", "mail ", "send email", "send mail"]):
+        return {"sub": "send_email", "raw": text}
+
+    # ── system commands ────────────────────────
     if any(w in lowered for w in ["screenshot", "screen shot", "capture screen", "snap"]):
         return {"sub": "screenshot"}
     if any(w in lowered for w in ["lock", "lock screen", "lock pc", "lock computer"]):
@@ -669,31 +805,48 @@ def parse_t3_subcommand(text: str) -> dict:
         return {"sub": "volume_up"}
     if any(w in lowered for w in ["volume down", "vol down", "quieter", "decrease volume", "turn down", "lower volume"]):
         return {"sub": "volume_down"}
-    if any(w in lowered for w in ["task manager", "taskmgr", "processes", "open task"]):
-        return {"sub": "task_manager"}
-    if any(w in lowered for w in ["restart explorer", "explorer crash", "fix taskbar", "reload explorer"]):
-        return {"sub": "restart_explorer"}
     for trigger in ["close ", "kill ", "quit "]:
         if trigger in lowered:
             return {"sub": "close_app", "app": lowered.split(trigger)[-1].strip()}
+
     return {"sub": "unknown"}
 
 
 def execute_t3(decision: dict, log_callback):
     sub = decision.get("sub", "unknown")
-    if sub == "screenshot":         t3_screenshot(log_callback)
-    elif sub == "lock":             t3_lock_screen(log_callback)
-    elif sub == "sleep":            t3_sleep_pc(log_callback)
-    elif sub == "mute":             t3_mute_toggle(log_callback)
-    elif sub == "volume_up":        t3_volume_up(log_callback)
-    elif sub == "volume_down":      t3_volume_down(log_callback)
-    elif sub == "task_manager":     t3_open_task_manager(log_callback)
-    elif sub == "restart_explorer": t3_restart_explorer(log_callback)
-    elif sub == "close_app":        t3_close_app(decision.get("app", ""), log_callback)
+
+    if sub == "send_email":
+        parsed = _parse_email_command(decision.get("raw", ""))
+        t3_send_email(parsed, log_callback)
+
+    elif sub == "scan_spam":
+        t3_scan_spam(log_callback)
+
+    elif sub == "open_inbox":
+        t3_open_inbox(log_callback)
+
+    elif sub == "open_sent":
+        t3_open_sent(log_callback)
+
+    elif sub == "search_email":
+        t3_search_email(decision.get("query", ""), log_callback)
+
+    elif sub == "screenshot":    t3_screenshot(log_callback)
+    elif sub == "lock":          t3_lock_screen(log_callback)
+    elif sub == "sleep":         t3_sleep_pc(log_callback)
+    elif sub == "mute":          t3_mute_toggle(log_callback)
+    elif sub == "volume_up":     t3_volume_up(log_callback)
+    elif sub == "volume_down":   t3_volume_down(log_callback)
+    elif sub == "close_app":     t3_close_app(decision.get("app", ""), log_callback)
+
     else:
-        log_callback("T3 — didn't understand that command.")
-        log_callback("Try: screenshot · lock · sleep · mute · volume up/down")
-        log_callback("     task manager · restart explorer · close chrome")
+        log_callback("T3 — commands available:")
+        log_callback("  📧 email name subject meeting body see you at 10")
+        log_callback("  📧 send mail to contact subject hello")
+        log_callback("  🔍 scan spam  |  check inbox  |  open sent")
+        log_callback("  🔎 search email invoice")
+        log_callback("  💻 screenshot · lock · sleep · mute · volume up/down")
+        log_callback("  ❌ close chrome / spotify / discord")
 
 
 # ─────────────────────────────────────────────
@@ -859,10 +1012,14 @@ def heuristic_route(user_input):
     t3_triggers = [
         "screenshot", "lock screen", "lock pc", "sleep pc", "sleep computer",
         "mute", "unmute", "volume up", "volume down", "vol up", "vol down",
-        "task manager", "taskmgr", "restart explorer", "close chrome",
-        "close spotify", "close firefox", "close edge", "close discord",
+        "close chrome", "close spotify", "close firefox", "close edge", "close discord",
         "close ", "kill ", "louder", "quieter", "turn up", "turn down",
         "lock computer", "hibernate", "snap screen",
+        # email triggers
+        "email ", "mail ", "send email", "send mail",
+        "scan spam", "check spam", "spam emails", "suspicious emails",
+        "check inbox", "open inbox", "open gmail", "check email", "check mail",
+        "open sent", "sent emails", "search email", "find email",
     ]
     if any(t in lowered for t in t3_triggers):
         sub = parse_t3_subcommand(lowered)
@@ -913,21 +1070,18 @@ Actions:
    Return: {"action":"file_organize","sub":"..."}
    sub values: organize, undo, duplicates, old_files, largest, collect, search
 
-5. "window_control" — system/app control.
-   Return: {"action":"window_control","sub":"...","app":"..."}
-   sub values: screenshot, lock, sleep, mute, volume_up, volume_down, task_manager, restart_explorer, close_app
+5. "window_control" — email, system/app control.
+   Return: {"action":"window_control","sub":"...","app":"...","raw":"..."}
+   sub values: send_email, scan_spam, open_inbox, open_sent, search_email,
+               screenshot, lock, sleep, mute, volume_up, volume_down, close_app
 
 Examples:
-{"action":"file_organize","sub":"organize"}
-{"action":"file_organize","sub":"undo"}
-{"action":"file_organize","sub":"duplicates"}
-{"action":"file_organize","sub":"old_files"}
-{"action":"file_organize","sub":"largest"}
+{"action":"window_control","sub":"send_email","raw":"email name subject meeting body see you at 10"}
+{"action":"window_control","sub":"scan_spam"}
+{"action":"window_control","sub":"open_inbox"}
+{"action":"window_control","sub":"search_email","query":"invoice"}
 {"action":"window_control","sub":"screenshot"}
 {"action":"window_control","sub":"close_app","app":"chrome"}
-{"action":"delivery_search","query":"sneakers","sites":["amazon","flipkart"]}
-{"action":"website_open","site_name":"youtube"}
-{"action":"web_search","query":"python tutorials"}
 """.strip()
 
     if not GEMINI_MODEL:
@@ -1141,7 +1295,7 @@ class FloatingWidget(ctk.CTk):
         hints = {
             "T1": "T1 — Website / Search  |  'open youtube'  'search sneakers'",
             "T2": "T2 — Files  |  organise · undo · delete duplicates · old files 6 months · largest files",
-            "T3": "T3 — System  |  screenshot · lock · sleep · mute · volume up/down · task manager · close chrome",
+            "T3": "T3 — Email & System  |  'email contact subject hi body hello'  'scan spam'  'check inbox'  screenshot · lock · mute",
         }
         self.hint_label.configure(text=hints.get(task_id, ""))
         if not self._expanded:
