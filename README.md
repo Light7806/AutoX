@@ -60,7 +60,7 @@ Clean up Downloads, remove duplicates, search by keyword, find old files, and so
 ### Email and system control
 Compose emails, open inbox or sent mail, scan spam, take screenshots, mute sound, adjust volume, lock the PC, or put it to sleep.
 
-## Example commands
+## Example commands ⌨️
 
 ```text
 open youtube
@@ -95,7 +95,7 @@ Then run the app:
 python main.py
 ```
 
-## Requirements
+## Requirements ✍️
 
 - Windows
 - Google Chrome
@@ -103,7 +103,7 @@ python main.py
 - Gemini API key
 
 ## Future plans
-
+--making it an app, much accesible
 - Better command understanding
 - Safer confirmation for sensitive actions
 - More file tools
@@ -114,3 +114,6 @@ python main.py
 ## Final note 📜
 
 This started as a hackathon project, but I’m treating it like something I actually want to grow into a real productivity tool.
+
+
+THIS IS THE PROJECT🎊🥳
