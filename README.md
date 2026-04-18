@@ -1,12 +1,12 @@
 # AutoX
-# Chief of Staff
+# Chief of Staff 🤖
 
 Chief of Staff is my personal AI desktop assistant for Windows.  
 It listens to simple natural language commands and turns them into real actions like opening websites, organizing files, managing email, and handling basic system tasks.
 
 I built this because I wanted one place that could help me move faster without jumping between apps, folders, and browser tabs all the time.
 
-## What it can do
+## What it can do 🧑‍🏭
 
 - Open websites quickly
 - Search the web
@@ -21,7 +21,7 @@ I built this because I wanted one place that could help me move faster without j
 - Mute or change volume
 - Close apps
 
-## How it works
+## How it works 🤔
 
 You type a command in plain English, and the app figures out what you mean.
 
@@ -37,13 +37,13 @@ For example:
 
 The app then routes the command to the right action and handles it for you.
 
-## Why I made it
+## Why I made it 🤨
 
 I wanted something that feels more like a real assistant than just another script or button-based tool.
 
 Instead of making me do repetitive desktop tasks manually, Chief of Staff helps me do them faster with simple commands.
 
-## Tech stack
+## Tech stack ⚙️
 
 - Python
 - CustomTkinter
@@ -53,7 +53,7 @@ Instead of making me do repetitive desktop tasks manually, Chief of Staff helps 
 - Pillow
 - send2trash
 
-## Features in detail
+## Features in detail 🧬
 
 ### Web commands
 Open websites, search the internet, and jump to common services like Gmail, Claude, ChatGPT, YouTube, Amazon, and Flipkart.
@@ -79,7 +79,7 @@ take a screenshot
 close discord
 ```
 
-## Setup
+## Setup 🧑‍💻
 
 ```bash
 git clone https://github.com/your-username/your-repo-name.git
@@ -115,6 +115,6 @@ python main.py
 - A cleaner and more polished interface
 - Possible support for more platforms later
 
-## Final note
+## Final note 📜
 
 This started as a hackathon project, but I’m treating it like something I actually want to grow into a real productivity tool.
