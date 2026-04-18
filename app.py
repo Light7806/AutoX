@@ -23,7 +23,7 @@ CHROME_USER_DATA_DIR = os.getenv("CHROME_USER_DATA_DIR", DEFAULT_CHROME_USER_DAT
 CHROME_PROFILE_NAME = os.getenv("CHROME_PROFILE_NAME", "Default").strip() or "Default"
 REMOTE_DEBUGGING_PORT = int(os.getenv("CHROME_DEBUG_PORT", "9222"))
 
-GEMINI_API_KEY = os.getenv("AIzaSyB00W86qQGlva9YXHW0_bK9lAYznMeOQbE", "").strip()
+GEMINI_API_KEY = os.getenv("", "").strip()
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     GEMINI_MODEL = genai.GenerativeModel("gemini-2.5-flash")
