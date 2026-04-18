@@ -16,10 +16,6 @@ I built this because I wanted one place that could help me move faster without j
 - Collect files by type like PDFs or images
 - Send emails through Gmail
 - Search inbox, sent mail, and spam
-- Take screenshots
-- Lock the screen
-- Mute or change volume
-- Close apps
 
 ## How it works 🤔
 
